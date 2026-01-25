@@ -1,0 +1,135 @@
+body {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background-color: #eeeeee;
+}
+
+#photo-display {
+  height: calc(100% + 200px);
+}
+.controls {
+  margin-bottom: 20px;
+}
+.controls input,
+.controls button {
+  margin-right: 10px;
+  padding: 10px;
+  font-size: 1em;
+}
+.photo-container {
+  position: relative;
+  display: inline-block;
+  margin: 20px;
+  width: 100%;
+  max-width: 300px; /* 適切なプレビューサイズに調整 */
+}
+canvas {
+  width: 100%; /* キャンバスを画面幅に合わせる */
+  height: auto;
+  display: block;
+}
+.save-btn {
+  display: block;
+  margin: 10px 0;
+  padding: 5px 10px;
+  font-size: 1em;
+}
+
+textarea {
+  overflow: scroll;
+  resize: none;
+  box-sizing: border-box;
+  line-height: 1;
+  margin-left: 10px;
+  background-color: #eeeeee;
+  border-radius: 4px;
+  color: #000000;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  border-color: #aaaaaa;
+  width: 30%;
+  height: 35px; /* Adjust this value based on the toolbar and status bar height */
+}
+
+#textContainer {
+  position: relative;
+  top: 200px;
+  flex: 1;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.h2 {
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.toolbar {
+  display: flex;
+  position: fixed;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  align-items: center;
+  padding: 20px;
+  height: 50px;
+  background-color: #dddddd;
+  border-bottom: 3px solid #ccc;
+  z-index: 10000;
+  width: 100vw;
+  white-space: nowrap
+}
+
+.toolbar label {
+  margin-right: 5px;
+  margin-left: 15px;
+}
+
+input {
+  border-radius: 3px;
+  border: 1px solid #aaaaaa;
+  height: 24px;
+  background-color: #eeeeee;
+}
+
+.social_button {
+  border: 1px solid;
+  padding: 4px 6px;
+  border-radius: 3px;
+  border: 1px solid #007bff;
+  margin: 4px;
+  background-color: #007bff;
+  color: white;
+  transition: 0.3s;
+}
+
+.social_button:hover {
+  background-color: #0056b3;
+}
+
+select {
+  border-radius: 3px;
+  border: 1px solid #aaaaaa;
+  background-color: #eeeeee;
+  height: 24px;
+}
+
+#status-bar label {
+  margin-right: 5px;
+}
+
+#status-bar {
+  align-items: center;
+  padding: 10px;
+  background-color: #dddddd;
+  border-top: 0px solid #ccc;
+  position: fixed;
+  bottom: 0px;
+  width: calc(100vw - 20px);
+  overflow: scroll;
+  display: flex;
+}
