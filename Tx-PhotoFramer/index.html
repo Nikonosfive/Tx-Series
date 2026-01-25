@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tx Photo Framer by TADR</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <div class="toolbar">
+    <h2>Tx.Pf</h2>
+    <label for="frame-text-input">Text</label>
+    <input type="text" id="frame-text-input" placeholder="下部枠のテキストを入力">
+    <label for="text-size-input">Text Size (%)</label>
+    <input type="number" id="text-size-input" placeholder="テキストサイズ (%)" min="1" max="100" value="5">
+    <label for="font-select">Font</label>
+    <select id="font-select">
+      <option value="Arial">Arial</option>
+      <option value="Times New Roman">Times New Roman</option>
+      <option value="Courier New">Courier New</option>
+      <option value="Georgia">Georgia</option>
+      <option value="Verdana">Verdana</option>
+    </select>
+    <label for="frame-width-input">Frame Width (%)</label>
+    <input type="number" id="frame-width-input" placeholder="枠幅 (%)" min="1" max="50" value="5">
+    <label for="bottom-frame-height-input">Bottom Frame Height (%)</label>
+    <input type="number" id="bottom-frame-height-input" placeholder="下枠の高さ (%)" min="1" max="50" value="10">
+    <button id="apply-text-btn" class="social_button" style="margin-left: 10px;">Apply</button>
+    <a> 　　　</a>
+  </div>
+  <div id="textContainer">
+    <div id="photo-display"></div>
+  </div>
+
+  <div id="status-bar">
+    <label class="social_button" for="save-all-btn">Save</label>
+    <button id="save-all-btn" class="social_button" hidden>Save</button>
+    <label class="social_button" for="photo-input">Input</label>
+    <input type="file" id="photo-input" multiple accept="image/jpeg" hidden>
+    <textarea id="settings-output" readonly placeholder="ここに設定済みのクエリが表示されます"></textarea>
+    <button id="generate-url-btn" class="social_button">Get Query</button>
+  </div>
+
+  <script>
+    const photoInput = document.getElementById('photo-input');
+    const photoDisplay = document.getElementById('photo-display');
+    const frameTextInput = document.getElementById('frame-text-input');
+    const textSizeInput = document.getElementById('text-size-input');
+    const fontSelect = document.getElementById('font-select');
+    const frameWidthInput = document.getElementById('frame-width-input');
+    const bottomFrameHeightInput = document.getElementById('bottom-frame-height-input');
+    const applyTextBtn = document.getElementById('apply-text-btn');
+    const saveAllBtn = document.getElementById('save-all-btn');
+    const generateUrlBtn = document.getElementById('generate-url-btn');
+    const settingsOutput = document.getElementById('settings-output');
+    let selectedFiles = [];
+
+    // URLクエリパラメータの取得関数
+    function getQueryParams() {
+      const params = new URLSearchParams(window.location.search);
+      return {
+        text: params.get('text') || '',
+        size: parseFloat(params.get('size')) || 5,
+        font: params.get('font') || 'Arial',
+        frameWidth: parseFloat(params.get('frameWidth')) || 5,
+        bottomFrameHeight: parseFloat(params.get('bottomFrameHeight')) || 10
+      };
+    }
+
+    // 設定クエリを生成する関数
+    function generateQuery() {
+      const text = encodeURIComponent(frameTextInput.value);
+      const size = textSizeInput.value;
+      const font = encodeURIComponent(fontSelect.value);
+      const frameWidth = frameWidthInput.value;
+      const bottomFrameHeight = bottomFrameHeightInput.value;
+      const baseUrl = window.location.origin + window.location.pathname;
+      return `${baseUrl}?text=${text}&size=${size}&font=${font}&frameWidth=${frameWidth}&bottomFrameHeight=${bottomFrameHeight}`;
+    }
+
+    // URLクエリパラメータを元に設定を反映する
+    function applySettingsFromURL() {
+      const params = getQueryParams();
+      if (params.text) {
+        frameTextInput.value = params.text;
+      }
+      if (params.size) {
+        textSizeInput.value = params.size;
+      }
+      if (params.font) {
+        fontSelect.value = params.font;
+      }
+      if (params.frameWidth) {
+        frameWidthInput.value = params.frameWidth;
+      }
+      if (params.bottomFrameHeight) {
+        bottomFrameHeightInput.value = params.bottomFrameHeight;
+      }
+    }
+
+    // 画像の読み込み処理
+    photoInput.addEventListener('change', (event) => {
+      selectedFiles = Array.from(event.target.files);
+      displayPhotos(); // 写真を表示
+    });
+
+    // 文字を反映するボタンのクリックイベント
+    applyTextBtn.addEventListener('click', () => {
+      displayPhotos();
+    });
+
+    // すべて保存ボタンのクリックイベント
+    saveAllBtn.addEventListener('click', () => {
+      const canvases = document.querySelectorAll('canvas');
+      canvases.forEach((canvas, index) => {
+        saveImage(canvas, index);
+      });
+    });
+
+    // 設定クエリを生成・表示するボタンのクリックイベント
+    generateUrlBtn.addEventListener('click', () => {
+      const query = generateQuery();
+      settingsOutput.value = query;
+      settingsOutput.select();
+      document.execCommand('copy');
+      alert('設定クエリがコピーされました！');
+    });
+
+    // ページロード時にURLクエリから設定を適用
+    window.addEventListener('DOMContentLoaded', () => {
+      applySettingsFromURL();
+      // クエリパラメータが存在する場合、自動的にテキストを反映
+      if (window.location.search) {
+        displayPhotos();
+      }
+    });
+
+    function displayPhotos() {
+      photoDisplay.innerHTML = ''; // 既存の写真をクリア
+      const frameText = frameTextInput.value || 'Default Text'; // テキスト入力欄の内容
+      const textSizePercent = parseFloat(textSizeInput.value) || 5; // テキストサイズ％
+      const selectedFont = fontSelect.value || 'Arial'; // 選択されたフォント
+      const frameWidthPercent = parseFloat(frameWidthInput.value) || 5; // 枠幅％
+      const bottomFrameHeightPercent = parseFloat(bottomFrameHeightInput.value) || 10; // 下部枠の高さ％
+
+      selectedFiles.forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const image = new Image();
+          image.src = e.target.result;
+          image.onload = () => {
+            // 高さと幅のうちの長い方を基準にする
+            const longerSide = Math.max(image.width, image.height);
+            const frameSize = longerSide * (frameWidthPercent / 100);
+            const bottomFrameHeight = longerSide * (bottomFrameHeightPercent / 100);
+            const textSize = longerSide * (textSizePercent / 100); // 画像の長辺に対するテキストサイズ
+            const container = document.createElement('div');
+            container.classList.add('photo-container');
+
+            // 枠付きJPEG画像を表示
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = image.width + 2 * frameSize;
+            canvas.height = image.height + frameSize + bottomFrameHeight;
+
+            // 黒い枠を描画
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 画像を描画
+            ctx.drawImage(image, frameSize, frameSize);
+
+            // 下部に中央配置のテキストをキャンバスに描画
+            ctx.font = `${textSize}px ${selectedFont}`; // ユーザー指定のフォントサイズとフォント
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(frameText, canvas.width / 2, canvas.height - bottomFrameHeight / 2);
+
+            container.appendChild(canvas);
+
+            // 画像を保存するボタンを追加
+            const saveBtn = document.createElement('button');
+            saveBtn.innerText = '画像を保存';
+            saveBtn.classList.add('social_button');
+            saveBtn.addEventListener('click', () => saveImage(canvas, index));
+            container.appendChild(saveBtn);
+
+            photoDisplay.appendChild(container);
+          };
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+
+    function resizeImage(canvas, maxSize, index) {
+      return new Promise((resolve) => {
+        const image = new Image();
+        image.src = canvas.toDataURL();
+
+        image.onload = () => {
+          const ratio = image.width / image.height;
+          let newWidth, newHeight;
+
+          if (image.width > image.height) {
+            newWidth = maxSize;
+            newHeight = maxSize / ratio;
+          } else {
+            newHeight = maxSize;
+            newWidth = maxSize * ratio;
+          }
+
+          const resizedCanvas = document.createElement('canvas');
+          resizedCanvas.width = newWidth;
+          resizedCanvas.height = newHeight;
+          const ctx = resizedCanvas.getContext('2d');
+          ctx.drawImage(image, 0, 0, newWidth, newHeight);
+
+          saveImage(resizedCanvas, index);
+          resolve(); // すべて完了したらPromiseを解決
+        };
+      });
+    }
+
+    
+    function saveImage(canvas, index) {
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/jpeg');
+      link.download = `framed_image_${index + 1}.jpg`;
+      link.click();
+    }
+  </script>
+</body>
+
+</html>
