@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tx Drawer by TADR</title>
+    <style>
+      
+      label{
+        font-size: 0.7em;
+      }
+        .tbt {
+            width: 30px;
+            height: 30px;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 3px;
+            margin: 3px;
+            background-color: #007bff;
+            color: white;
+            border: 1px solid #007bff;
+            border-radius: 5px;
+        }
+        .tbt:focus {
+            background-color: #ffffff;
+            color: #007bff;
+        }
+      
+      .tbt:hover{
+        opacity: 0.7;
+      }
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+        canvas {
+            border: 0px solid black;
+            display: block;
+            touch-action: none;
+            width: 100vw;
+            height: 100vh;
+        }
+        .toolbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            background-color: white;
+            padding: 10px;
+            z-index: 10;
+            white-space: nowrap;
+            justify-content: center;
+            overflow: scroll;
+        }
+      
+        input[type="range"] {
+            -webkit-appearance: slider-vertical;
+            width: 30px;
+            height: 160px;
+        }
+      
+      input[type="number"] {
+            -webkit-appearance: slider-vertical;
+            width: 30px;
+            height: 30px;
+        }
+        input, button {
+            display: flex;
+            flex-direction: column;
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <a><b>Tx.D</b></a><br>
+        <label for="penSizeRange">Size</label>
+        <input type="range" id="penSizeRange" min="1" max="50" value="5" class="vert" class="tbt">
+        <input type="number" id="penSizeNumber" min="1" max="50" value="5" class="tbt">
+        <input type="color" id="colorPicker" value="#000000" class="tbt">
+        <button id="penMode" class="tbt">✏</button>
+        <button id="eraserMode" class="tbt">✂</button>
+        <button id="fillMode" class="tbt">🪣</button>
+        <button id="clearCanvas" class="tbt">🗑️</button>
+        <button id="undo" class="tbt">⟲</button>
+        <button id="redo" class="tbt">⟳</button>
+      <label for="offsetX">X Offset</label>
+        <input type="number" id="offsetX" value="0" class="tbt">
+        <label for="offsetY">Y Offset</label>
+        <input type="number" id="offsetY" value="0" class="tbt">
+    </div>
+    <div id="canvasContainer" style="position: relative;"></div>
+    <script src="drawingTool.js"></script>
+</body>
+</html>
