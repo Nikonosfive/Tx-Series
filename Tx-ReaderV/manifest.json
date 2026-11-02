@@ -1,0 +1,41 @@
+{
+  "short_name": "TX.RV",
+  "name": "TX.RV",
+  "description": "縦書きテキストリーダー",
+  "version": "1",
+  "icons": [
+      {
+        "src": "img/logo_96.png",
+        "type": "image/png",
+        "sizes": "96x96"
+      },
+      {
+        "src": "img/logo_144.png",
+        "type": "image/png",
+        "sizes": "144x144"
+      },
+      {
+        "src": "img/logo_192.png",
+        "type": "image/png",
+        "sizes": "192x192"
+      },
+      {
+        "src": "img/logo_512.png",
+        "type": "image/png",
+        "sizes": "512x512"
+      },
+      {
+        "src": "img/logo_512.png",
+        "type": "image/png",
+        "sizes": "512x512",
+        "purpose": "maskable"
+      }
+    ],
+  "start_url": "https://site.tadr-tech.info/TX-ReaderV",
+  "display": "standalone",
+  "lang": "ja-JP",
+  "theme_color": "#000000",
+  "background_color": "#000000",
+  "related_applications": [ ],
+  "prefer_related_applications": false,
+}
