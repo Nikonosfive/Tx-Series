@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Tx.RV (改 v3)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho&display=swap" rel="stylesheet">
+  <meta name="application-name" content="Tx.RV">
+  <meta name="theme-color" content="#f4f4f4">
+  <meta name="description" content="Tx.RV">
+  <meta name="keywords" content="縦書きテキストリーダー">
+  <link rel="icon" href="img/logo.svg" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="img/ios_logo.png" />
+  <script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag('js', new Date());
+    gtag('config', 'G-199SL59897');
+  </script>
+
+  <script>
+    if ("serviceWorker" in navigator) {
+      const swScript = `
+        const CACHE_NAME = 'txrv-cache-v3';
+        const urlsToCache = [
+          './' 
+        ];
+
+        self.addEventListener('install', (event) => {
+          event.waitUntil(
+            caches.open(CACHE_NAME)
+              .then((cache) => {
+                console.log('Opened cache');
+                return cache.addAll(urlsToCache);
+              })
+              .catch((err) => {
+                 console.error('Failed to cache base URL:', err);
+              })
+          );
+        });
+
+        self.addEventListener('fetch', (event) => {
+          const requestUrl = new URL(event.request.url);
+
+          // GA/GTM (ネットワークのみ。オフラインでは失敗させる)
+          if (requestUrl.hostname === 'www.googletagmanager.com' ||
+              requestUrl.hostname === 'www.google-analytics.com') {
+            event.respondWith(
+                fetch(event.request).catch(() => new Response(null, { status: 408, statusText: "Network error" }))
+            );
+            return;
+          }
+
+          if (requestUrl.hostname === 'fonts.googleapis.com') {
+            event.respondWith(
+              caches.open(CACHE_NAME).then((cache) => {
+                return cache.match(event.request).then((cachedResponse) => {
+                  const fetchPromise = fetch(event.request).then((networkResponse) => {
+                    if (networkResponse && networkResponse.status === 200) {
+                      cache.put(event.request, networkResponse.clone());
+                    }
+                    return networkResponse;
+                  }).catch(() => cachedResponse); 
+                  return cachedResponse || fetchPromise;
+                });
+              })
+            );
+            return;
+          }
+
+          if (requestUrl.hostname === 'fonts.gstatic.com') {
+             event.respondWith(
+                caches.match(event.request)
+                  .then((response) => {
+                    if (response) {
+                      return response;
+                    }
+                    return fetch(event.request).then((networkResponse) => {
+                      return caches.open(CACHE_NAME).then((cache) => {
+                         if (networkResponse && networkResponse.status === 200) {
+                           cache.put(event.request, networkResponse.clone());
+                         }
+                         return networkResponse;
+                      });
+                    });
+                  })
+             );
+             return;
+          }
+
+          event.respondWith(
+             fetch(event.request).then((networkResponse) => {
+                if (networkResponse && networkResponse.status === 200) {
+                   const responseToCache = networkResponse.clone();
+                   caches.open(CACHE_NAME).then((cache) => {
+                       cache.put(event.request, responseToCache);
+                   });
+                }
+                return networkResponse;
+             }).catch(() => {
+                return caches.match(event.request);
+             })
+          );
+        });
+
+        self.addEventListener('activate', (event) => {
+          const cacheWhitelist = [CACHE_NAME];
+          event.waitUntil(
+            caches.keys().then((cacheNames) => {
+              return Promise.all(
+                cacheNames.map((cacheName) => {
+                  if (cacheWhitelist.indexOf(cacheName) === -1) {
+                    return caches.delete(cacheName);
+                  }
+                })
+              );
+            })
+          );
+        });
+      `;
+
+      try {
+        const blob = new Blob([swScript], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(blob);
+
+        navigator.serviceWorker.register(swUrl, { scope: './' })
+          .then((registration) => {
+            console.log("Service Worker registered (inline v3) with scope:", registration.scope);
+          })
+          .catch((error) => {
+            console.error("Service Worker registration failed:", error);
+          });
+      } catch (e) {
+         console.error("Failed to create SW blob:", e);
+      }
+    }
+  </script>
+
+  <style>
+    body,
+    html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background-color: #f4f4f4;
+      font-family: serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .view {
+      display: none;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .view.active {
+      display: block;
+    }
+
+    #libraryView {
+      margin: 0;
+      padding: 0.5rem;
+      box-sizing: border-box;
+      overflow-y: hidden;
+      background-color: #f0f0f0;
+    }
+
+    #libraryView h1 {
+      margin: 0 0 0 0;
+      font-family: "Helvetica", "serif";
+      color: #555;
+      border-bottom: 2px solid #f0f0f0;
+      padding-bottom: 0;
+    }
+
+    .upload-section {
+      margin: 0;
+      padding: 1rem;
+      background: #fdfdfd;
+      border: 1px solid #eee;
+      border-radius: 2rem;
+      height: 4rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      font-family: "Helvetica", "serif";
+      text-align: center;
+      justify-content: center;
+    }
+
+    #fileList {
+      list-style-type: none;
+      padding: 0;
+      margin: 0;
+      font-family: "Helvetica", "serif";
+    }
+
+    #fileList li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1rem;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    #fileList li:last-child {
+      border-bottom: none;
+    }
+
+    .file-info {
+      flex-grow: 1;
+      cursor: pointer;
+      line-height: 1.4;
+    }
+
+    .file-info strong {
+      font-size: 1.1rem;
+      color: #000;
+      font-weight: 400;
+    }
+
+    .file-info span {
+      font-size: 0.8rem;
+      color: #888;
+      margin-right: 10px;
+    }
+
+    .file-info .file-progress {
+      font-size: 0.8rem;
+      font-weight: regular;
+      color: #888;
+      margin-left: 0px;
+    }
+
+    .file-actions {
+      display: flex;
+      flex-direction: row; //collumは縦積み
+      gap: 0;
+    }
+
+    .file-actions button {
+      background: none;
+      background-color: #f0f0f0;
+      color: #0f0f0f;
+      border: 0 solid;
+      border-radius: 0.6rem;
+      height: 2rem;
+      padding: 0 0.4rem;
+      cursor: pointer;
+      font-size: 0.8rem;
+      line-height: 1rem;
+    }
+
+    .file-actions .delete-btn {
+      border-radius: 0 0.6rem 0.6rem 0;
+    }
+
+    .file-actions .delete-btn:active {
+      background-color: #ff7777;
+      color: white;
+    }
+
+    .file-actions .rename-btn {
+      border-radius: 0.6rem 0 0 0.6rem;
+      border-right: 1px solid #ffffff;
+    }
+
+
+    .file-actions .rename-btn:active {
+      border: 0 solid;
+      background-color: #cccccc;
+    }
+
+    #libraryMessage {
+      color: #777;
+      padding: 2rem;
+      font-family: "Helvetica", "serif";
+    }
+
+    .subtitle {
+      font-size: 0.5em;
+      margin: 0.25em;
+      vertical-align: middle;
+    }
+
+    .pagename {
+      font-size: 1em;
+      margin: 0.25em;
+      vertical-align: middle;
+    }
+
+    .mini {
+      font-size: 0.5rem;
+      margin: 0.25em;
+      vertical-align: middle;
+      font-weight: 300;
+    }
+
+    .viewer-container {
+      width: 100vw;
+      height: 100vh;
+      writing-mode: vertical-rl;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+      scroll-behavior: smooth;
+      overflow-wrap: break-word;
+      text-align: justify;
+      background-color: #ffffff;
+    }
+
+    .viewer-container::-webkit-scrollbar {
+      display: none;
+    }
+
+    .text-content {
+      height: 90vh;
+      padding: 5vh 0;
+      column-width: 85vw;
+      column-gap: 1.5em;
+      font-size: 1.2rem;
+      letter-spacing: 0.1em;
+      line-height: 1.8;
+      line-break: auto;
+      scroll-snap-align: start;
+      color: #777;
+      white-space: pre-wrap;
+      position: relative;
+      z-index: 1;
+    }
+
+    .controls {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.8);
+      border-top: 0px solid #ccc;
+      padding: 10px 15px;
+      box-sizing: border-box;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      font-size: 1rem;
+      font-family: "Helvetica", "serif";
+      z-index: 10;
+      transition: transform 0.3s ease-in-out;
+      border-radius: 2rem 2rem 0 0;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    }
+
+    .controls.hidden {
+      transform: translateY(100%);
+    }
+
+    .controls>div {
+      display: flex;
+      align-items: center;
+      gap: 0px;
+    }
+
+    .controls input[type="range"] {
+      width: 100px;
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      order: -1;
+      padding-bottom: 5px;
+    }
+
+    #progressBar {
+      width: 100%;
+      margin: 0;
+      margin-top: 0.5rem;
+      pointer-events: none;
+    }
+
+    .ui-toggle-btn {
+      position: fixed;
+      top: 0.3rem;
+      z-index: 11;
+      width: 3.0rem;
+      height: 3.0rem;
+      line-height: 3rem;
+      font-size: 1.6rem;
+      color: #aaa;
+      background: rgba(255, 255, 255, 0.8);
+      border: 0px solid #ccc;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      display: none;
+    }
+
+
+    input.progressbar[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    input.progressbar[type="range"]::-moz-range-thumb {
+      appearance: none;
+      display: none;
+    }
+
+    input.commonbar[type="range"] {
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      width: 100%;
+      height: 25px;
+      margin: 10px 0;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    input.commonbar[type="range"]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 8px;
+      background: rgba(240, 240, 240, 0.6);
+      border-radius: 4px;
+      border: none;
+    }
+
+    input.commonbar[type="range"]::-moz-range-track {
+      width: 100%;
+      height: 8px;
+      background: rgba(240, 240, 240, 0.6);
+      border-radius: 4px;
+      border: none;
+    }
+
+    input.commonbar[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      margin-top: -8.5px;
+      height: 25px;
+      width: 12px;
+      background: #ccc;
+      border-radius: 20%;
+      border: 1px solid #fff;
+      box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+      transition: background 0.2s;
+    }
+
+    input.commonbar[type="range"]::-moz-range-thumb {
+      appearance: none;
+      height: 25px;
+      width: 12px;
+      background: #ccc;
+      border-radius: 20%;
+      border: 1px solid #fff;
+      box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+      transition: background 0.2s;
+    }
+
+    input.commonbar[type="range"]:hover::-webkit-slider-thumb,
+    input.commonbar[type="range"]:active::-webkit-slider-thumb {
+      background: #ddd;
+    }
+
+    input.commonbar[type="range"]:hover::-moz-range-thumb,
+    input.commonbar[type="range"]:active::-moz-range-thumb {
+      background: #ddd;
+    }
+
+    input.commonbar[type="range"]:focus {
+      outline: none;
+    }
+
+    input.commonbar[type="range"]:focus::-webkit-slider-runnable-track {
+      box-shadow: 0 0 0 2px #cce5ff;
+    }
+
+    input.commonbar[type="range"]:focus::-moz-range-track {
+      box-shadow: 0 0 0 2px #cce5ff;
+    }
+
+    .scale-posi:active {
+      scale: 1.1;
+    }
+
+    .range-control {
+      display: flex;
+      align-items: center;
+      gap: 0px;
+      flex-wrap: nowrap;
+    }
+
+
+    .range-button {
+      gap: 0;
+      font-size: 1.6rem;
+      height: 2.4rem;
+      width: 3.6rem;
+      cursor: pointer;
+      color: #0f0f0f;
+      background-color: #f0f0f0;
+      margin: 0;
+      border: 0;
+      padding: 0;
+      transition: background-color 0.3s ease;
+      opacity: 0.7;
+    }
+
+    .range-button:active {
+      background-color: #cccccc;
+    }
+
+    .minus-button {
+      border-radius: 0.6rem 0 0 0.6rem;
+    }
+
+    .plus-button {
+      border-radius: 0 0.6rem 0.6rem 0;
+    }
+
+    .groundV {
+      gap: 0;
+      padding: 0;
+      margin: 0;
+      background-color: #f0f0f0;
+      height: 2.4rem;
+      align-items: center;
+      display: flex;
+      justify-content: center;
+      opacity: 0.7;
+    }
+
+    .verticalbar {
+      gap:0 ;
+      padding: 0;
+      margin: 0;
+      position: relative;
+      background-color: #cccccc;
+      width: 2px;
+      height: 1.4rem;
+      border-radius: 10px;
+      opacity: 0.7;
+    }
+
+    .input-bar {
+      display: none;
+    }
+
+    span.value-label {
+      min-width: 2em;
+      text-align: right;
+      font-family: monospace;
+      color: #000000;
+      font-size: 1rem;
+      margin-right: 0.3rem;
+    }
+
+    input[type="file"], select {
+      -webkit-appearance: none;
+      height: 2.4rem;
+      border-radius: 0.6rem;
+      background-color: #f0f0f0;
+      font-size: 1.0rem;
+      color: black;
+    }
+
+    .input-tag {
+      background-color: #f0f0f0;
+      font-size: 1rem;
+      height: 3.2rem;
+      border-radius: 0.6rem;
+      line-height: 3.2rem;
+      padding: 0 2rem 0 2rem;
+      border: 0 solid;
+    }
+
+
+    .input-tag:active {
+      background-color: #cccccc;
+
+    }
+
+
+   label {
+      display: inline-block;
+      white-space: nowrap;
+    }
+
+   .library {
+      background-color: #ffffff;
+      height: calc(100vh - 11rem);
+      overflow-y: scroll;
+      border-radius: 2rem 2rem 0 0;
+    }
+
+   .top-contents {
+      height: 3rem;
+      line-height: 3rem;
+
+    }
+
+   .div-up {
+      background-color: yellow;
+      position: relative;
+      height: 3.2rem;
+      border-radius: 0.6rem;
+      display: inline;
+    }
+
+    .div-left {
+      border-radius: 0.6rem 0 0 0.6rem;
+    }
+
+    .div-right {
+      border-radius: 0 0.6rem 0.6rem 0;
+    }
+
+    .right-bar {
+      border-right: 1px #fff solid;
+    }
+
+    .pad-adjust {
+      padding: 0 1rem 0 1rem;
+    }
+
+  </style>
+</head>
+
+<body ontouchstart="">
+
+  <div id="libraryView" class="view active">
+   <div class="top-contents">
+    <h1><span class="subtitle">Tx.Reader Vertical</span><span class="pagename">マイ本棚</span><span class=""></span><span class="mini" id="L:list V:viewer C:code">L:1.00 V:1.00 C:1.00</span></h1></div>
+    <div class="upload-section">
+      <div class="div-up div-left">
+        <label for="fileInput" class="input-tag div-left right-bar" >本棚に追加する</label>
+        <input type="file" id="fileInput" accept=".txt" hidden>
+      </div>
+      <div class="div-up div-right">
+       <!--  <label for="encodingSelect"></label> -->
+        <select class="input-tag div-right pad-adjust" id="encodingSelect">
+          <option value="shift_jis" selected>Shift_JIS</option>
+          <option value="utf-8">UTF-8</option>
+          <option value="euc-jp">EUC-JP</option>
+        </select>
+      </div>
+    </div>
+　　<div class="library">
+    <ul id="fileList"></ul>
+    <div id="libraryMessage">
+　ようこそ、ここはTxシリーズの縦書き表示用テキストファイルビューワーである「Tx.RV」です。上の「新規ファイル」から、読みたいテキストファイルを選択してください。<br>
+　読み込んだファイルはここにキャッシュされ、次回からは選択するだけで続きが読めます。文字化けしてしまう際は、エンコードを変更して再読み込みしてください。
+    </div>
+   </div>
+  </div>
+
+
+  <div id="readerView" class="view">
+    <button class="ui-toggle-btn scale-posi" id="uiToggleBtn" style="right: 4rem;">・</button>
+    <button class="ui-toggle-btn scale-posi" id="backToLibraryBtn" style="right: 0.5rem; padding-top: 2px; font-family: 'Helvetica', 'serif';">＜</button>
+    <div class="controls" id="controlsPanel">
+      <div class="progress-bar-container">
+        <input type="range" class="progressbar" id="progressBar" min="0" max="100" step="0.1" value="0">
+      </div>
+
+      <!-- 文字サイズ -->
+      <div class="range-control" ontouchstart="">
+        <label for="fontSize">文字：</label>
+        <span class="value-label" id="fontSizeValue">1.2</span>
+        <button type="button" class="range-button minus-button" data-target="fontSize">ー</button>
+        <div class="groundV"><div class="verticalbar"></div></div>
+        <button type="button" class="range-button plus-button" data-target="fontSize">＋</button>
+        <input type="range" id="fontSize" class="input-bar" min="0.8" max="3" step="0.1" value="1.2">
+      </div>
+
+      <!-- 文字間 -->
+      <div class="range-control" ontouchstart="">
+        <label for="letterSpacing">文字間：</label>
+        <span class="value-label" id="letterSpacingValue">0.1</span>
+        <button type="button" class="range-button minus-button" data-target="letterSpacing">ー</button>
+        <div class="groundV"><div class="verticalbar"></div></div>
+        <button type="button" class="range-button plus-button" data-target="letterSpacing">＋</button>
+        <input type="range" id="letterSpacing" class="input-bar" min="0" max="1" step="0.05" value="0.1">
+      </div>
+
+      <!-- 行幅 -->
+      <div class="range-control" ontouchstart="">
+        <label for="lineHeight">行幅：</label>
+        <span class="value-label" id="lineHeightValue">1.8</span>
+        <button type="button" class="range-button minus-button" data-target="lineHeight">ー</button>
+        <div class="groundV"><div class="verticalbar"></div></div>
+        <button type="button" class="range-button plus-button" data-target="lineHeight">＋</button>
+        <input type="range" id="lineHeight" class="input-bar" min="1.2" max="3" step="0.1" value="1.8">
+      </div>
+
+      <!-- めくり量 -->
+      <div class="range-control" ontouchstart="">
+        <label for="flipWidth">めくり量：</label>
+        <span class="value-label" id="flipWidthValue">0.95</span>
+        <button type="button" class="range-button minus-button" data-target="flipWidth">ー</button>
+        <div class="groundV"><div class="verticalbar"></div></div>
+        <button type="button" class="range-button plus-button" data-target="flipWidth">＋</button>
+        <!-- 互換性のため既存の output 要素も残す -->
+        <output for="flipWidth" id="flipWidth_display" style="margin-left:8px; display: none;">0.95</output>
+        <input type="range" id="flipWidth" class="input-bar" min="0.01" max="1" step="0.01" value="0.95">
+      </div>
+
+      <div>
+        <label for="fontFamily">書体：</label>
+        <select id="fontFamily">
+          <option value="serif">明朝体</option>
+          <option value="Zen Old Mincho">Zen Old Mincho</option>
+          <option value="sans-serif">ゴシック体</option>
+        </select>
+      </div>
+
+      <div>
+        <input type="checkbox" id="swapTap">
+        <label for="swapTap">タップ左右入替</label>
+      </div>
+    </div>
+
+    <div class="viewer-container" id="viewerContainer">
+      <div class="text-content" id="textContent"></div>
+    </div>
+  </div>
+
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+      // --- IndexedDB 関連 (v2から変更なし) ---
+      let db;
+      let currentFileId = null;
+      let stateSaveTimer = null;
+      const DB_NAME = 'TxRV_FileCache';
+      const DB_VERSION = 1;
+      const STORE_NAME = 'files';
+
+      function initDB() {
+        return new Promise((resolve, reject) => {
+          if (!('indexedDB' in window)) {
+            alert('お使いのブラウザはIndexedDBをサポートしていません。');
+            return reject('IndexedDB not supported');
+          }
+          const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+          request.onerror = (event) => {
+            console.error('IndexedDB error:', event.target.error);
+            reject('DB error');
+          };
+
+          request.onsuccess = (event) => {
+            db = event.target.result;
+            console.log('IndexedDB opened successfully.');
+            resolve(db);
+          };
+
+          request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+              const objectStore = db.createObjectStore(STORE_NAME, {
+                keyPath: 'id',
+                autoIncrement: true
+              });
+              objectStore.createIndex('fileName', 'fileName', {
+                unique: false
+              });
+              console.log('Object store created.');
+            }
+          };
+        });
+      }
+
+      function saveFileToDB(fileData) {
+        return new Promise((resolve, reject) => {
+          const transaction = db.transaction([STORE_NAME], 'readwrite');
+          const store = transaction.objectStore(STORE_NAME);
+          const request = store.add(fileData);
+          request.onsuccess = (event) => resolve(event.target.result);
+          request.onerror = (event) => reject(event.target.error);
+        });
+      }
+
+      function getFileFromDB(id) {
+        return new Promise((resolve, reject) => {
+          const transaction = db.transaction([STORE_NAME], 'readonly');
+          const store = transaction.objectStore(STORE_NAME);
+          const request = store.get(id);
+          request.onsuccess = (event) => resolve(event.target.result);
+          request.onerror = (event) => reject(event.target.error);
+        });
+      }
+
+      function getAllFilesFromDB() {
+        return new Promise((resolve, reject) => {
+          const transaction = db.transaction([STORE_NAME], 'readonly');
+          const store = transaction.objectStore(STORE_NAME);
+          const request = store.getAll();
+          request.onsuccess = (event) => resolve(event.target.result);
+          request.onerror = (event) => reject(event.target.error);
+        });
+      }
+
+      function deleteFileFromDB(id) {
+        return new Promise((resolve, reject) => {
+          const transaction = db.transaction([STORE_NAME], 'readwrite');
+          const store = transaction.objectStore(STORE_NAME);
+          const request = store.delete(id);
+          request.onsuccess = (event) => resolve();
+          request.onerror = (event) => reject(event.target.error);
+        });
+      }
+
+      function updateFileName(id, newName) {
+        return new Promise((resolve, reject) => {
+          const transaction = db.transaction([STORE_NAME], 'readwrite');
+          const store = transaction.objectStore(STORE_NAME);
+          const getRequest = store.get(id);
+          getRequest.onsuccess = () => {
+            const fileData = getRequest.result;
+            if (fileData) {
+              fileData.fileName = newName;
+              const putRequest = store.put(fileData);
+              putRequest.onsuccess = () => resolve();
+              putRequest.onerror = (e) => reject(e.target.error);
+            } else {
+              reject('File not found');
+            }
+          };
+          getRequest.onerror = (e) => reject(e.target.error);
+        });
+      }
+
+      function updateReaderState(id, position, progress, settings) {
+        return new Promise((resolve, reject) => {
+          if (!db) {
+            return reject("DB not initialized");
+          }
+          const transaction = db.transaction([STORE_NAME], 'readwrite');
+          const store = transaction.objectStore(STORE_NAME);
+          const getRequest = store.get(id);
+          getRequest.onsuccess = () => {
+            const fileData = getRequest.result;
+            if (fileData) {
+              fileData.lastPosition = position;
+              fileData.progressPercent = progress;
+              fileData.settings = settings;
+              const putRequest = store.put(fileData);
+              putRequest.onsuccess = () => resolve();
+              putRequest.onerror = (e) => reject(e.target.error);
+            } else {
+              reject('File not found');
+            }
+          };
+          getRequest.onerror = (e) => reject(e.target.error);
+        });
+      }
+      // --- IndexedDB 関連 終了 ---
+
+
+      // --- ▼ v3 修正 ▼ DOM取得 (backToLibraryBtn の取得位置が移動したが、IDは同じ) ---
+      const libraryView = document.getElementById('libraryView');
+      const readerView = document.getElementById('readerView');
+      const fileList = document.getElementById('fileList');
+      const libraryMessage = document.getElementById('libraryMessage');
+      const backToLibraryBtn = document.getElementById('backToLibraryBtn');
+
+      const textContent = document.getElementById('textContent');
+      const viewerContainer = document.getElementById('viewerContainer');
+      const controlsPanel = document.getElementById('controlsPanel');
+      const uiToggleBtn = document.getElementById('uiToggleBtn');
+      const fileInput = document.getElementById('fileInput');
+      const encodingSelect = document.getElementById('encodingSelect');
+      const swapTapCheckbox = document.getElementById('swapTap');
+      const fontSizeSlider = document.getElementById('fontSize');
+      const columnGapSlider = document.getElementById('columnGap'); // exists in DOM but hidden previously
+      const letterSpacingSlider = document.getElementById('letterSpacing');
+      const lineHeightSlider = document.getElementById('lineHeight');
+      const fontFamilySelect = document.getElementById('fontFamily');
+      const progressBar = document.getElementById('progressBar');
+      const flipWidth = document.getElementById('flipWidth');
+      const flipWidthDisplay = document.getElementById('flipWidth_display');
+      // --- ▲ v3 修正 ▲ ---
+
+
+      // --- 設定適用ロジック (v2から変更なしだが表示同期を追加) ---
+      function getCurrentSettings() {
+        return {
+          fontSize: parseFloat(fontSizeSlider.value),
+          columnGap: parseFloat(columnGapSlider ? columnGapSlider.value : 1.5),
+          letterSpacing: parseFloat(letterSpacingSlider.value),
+          lineHeight: parseFloat(lineHeightSlider.value),
+          fontFamily: fontFamilySelect.value,
+          swapTap: swapTapCheckbox.checked,
+          flipWidth: parseFloat(flipWidth.value)
+        };
+      }
+
+      function applySettings(settings) {
+        fontSizeSlider.value = settings.fontSize;
+        if (columnGapSlider) columnGapSlider.value = settings.columnGap;
+        letterSpacingSlider.value = settings.letterSpacing;
+        lineHeightSlider.value = settings.lineHeight;
+        fontFamilySelect.value = settings.fontFamily;
+        swapTapCheckbox.checked = settings.swapTap;
+        flipWidth.value = settings.flipWidth;
+        // flipWidth_display is kept for compatibility
+        if (flipWidthDisplay) flipWidthDisplay.value = Number(settings.flipWidth).toFixed(2);
+
+        textContent.style.fontSize = settings.fontSize + 'rem';
+        if (columnGapSlider) textContent.style.columnGap = settings.columnGap + 'em';
+        textContent.style.letterSpacing = settings.letterSpacing + 'em';
+        textContent.style.lineHeight = settings.lineHeight;
+        textContent.style.fontFamily = settings.fontFamily;
+
+        // update visible span displays
+        updateValueDisplays();
+      }
+
+      function updateValueDisplays() {
+        const f = document.getElementById('fontSizeValue');
+        const ls = document.getElementById('letterSpacingValue');
+        const lh = document.getElementById('lineHeightValue');
+        const fw = document.getElementById('flipWidthValue');
+
+        if (fontSizeSlider && f) f.textContent = parseFloat(fontSizeSlider.value).toFixed(2).replace(/\.00$/, '');
+        if (letterSpacingSlider && ls) ls.textContent = parseFloat(letterSpacingSlider.value).toFixed(2).replace(/\.00$/, '');
+        if (lineHeightSlider && lh) lh.textContent = parseFloat(lineHeightSlider.value).toFixed(2).replace(/\.00$/, '');
+        if (flipWidth && fw) fw.textContent = parseFloat(flipWidth.value).toFixed(2).replace(/\.00$/, '');
+        if (flipWidth && flipWidthDisplay) flipWidthDisplay.value = parseFloat(flipWidth.value).toFixed(2);
+      }
+      // --- 設定適用 終了 ---
+
+      async function showLibraryView() {
+        currentFileId = null;
+        readerView.classList.remove('active');
+        controlsPanel.classList.add('hidden');
+        uiToggleBtn.style.display = 'none';
+        backToLibraryBtn.style.display = 'none';
+
+        libraryView.classList.add('active');
+        await populateLibrary();
+      }
+
+      async function openReaderView(id) {
+        try {
+          const fileData = await getFileFromDB(id);
+          if (!fileData) {
+            alert('ファイルの読み込みに失敗しました。');
+            return;
+          }
+
+          currentFileId = id;
+          textContent.textContent = fileData.content;
+          textContent.style.color = '#333';
+
+          libraryView.classList.remove('active');
+          readerView.classList.add('active');
+          uiToggleBtn.style.display = 'block';
+          backToLibraryBtn.style.display = 'block';
+          controlsPanel.classList.remove('hidden');
+          uiToggleBtn.textContent = '・';
+
+          const settingsToApply = fileData.settings || getCurrentSettings();
+          applySettings(settingsToApply);
+
+          viewerContainer.scrollLeft = fileData.lastPosition || 0;
+          setTimeout(updateProgress, 100);
+
+        } catch (error) {
+          console.error('Error opening reader:', error);
+          alert('リーダーの起動に失敗しました。');
+        }
+      }
+
+      async function populateLibrary() {
+        const files = await getAllFilesFromDB();
+        fileList.innerHTML = '';
+        if (files.length === 0) {
+          libraryMessage.style.display = 'block';
+        } else {
+          libraryMessage.style.display = 'none';
+          files.forEach(file => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+              <div class="file-info" data-id="${file.id}">
+                <strong>${escapeHTML(file.fileName)}</strong>
+                <br>
+                <span>${file.encoding}</span>
+                <span class="file-progress">進捗：${(file.progressPercent || 0).toFixed(0)}%</span>
+              </div>
+              <div class="file-actions">
+                <button class="rename-btn scale-posi" data-id="${file.id}">名前変更</button>
+                <button class="delete-btn scale-posi" data-id="${file.id}">削除</button>
+              </div>
+            `;
+            fileList.appendChild(li);
+          });
+
+          fileList.querySelectorAll('.file-info').forEach(item => {
+            item.addEventListener('click', (e) => {
+              const id = parseInt(e.currentTarget.dataset.id, 10);
+              openReaderView(id);
+            });
+          });
+
+          fileList.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+              e.stopPropagation();
+              const id = parseInt(e.currentTarget.dataset.id, 10);
+              if (confirm('本当にこのファイルを削除しますか？')) {
+                await deleteFileFromDB(id);
+                await populateLibrary();
+              }
+            });
+          });
+
+          fileList.querySelectorAll('.rename-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+              e.stopPropagation();
+              const id = parseInt(e.currentTarget.dataset.id, 10);
+              const fileData = await getFileFromDB(id);
+              const currentName = fileData.fileName;
+
+              const newName = prompt("新しい名前を入力してください", currentName);
+              if (newName && newName.trim() !== "" && newName !== currentName) {
+                await updateFileName(id, newName.trim());
+                await populateLibrary();
+              }
+            });
+          });
+        }
+      }
+
+      function escapeHTML(str) {
+        return str.replace(/[&<>"']/g, function(match) {
+          return {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+          }[match];
+        });
+      }
+      // --- ▲ v3 修正 ▲ ---
+
+
+      // --- プログレスバー (v2から変更なし) ---
+      function updateProgress() {
+        const container = viewerContainer;
+        const scrollableWidth = container.scrollWidth - container.clientWidth;
+        if (scrollableWidth <= 0) {
+          progressBar.value = 0;
+          return;
+        }
+        const progress = (Math.abs(container.scrollLeft) / scrollableWidth) * 100;
+        progressBar.value = Math.max(0, Math.min(100, progress));
+      }
+
+      function saveReaderStateDebounced() {
+        if (stateSaveTimer) {
+          clearTimeout(stateSaveTimer);
+        }
+        stateSaveTimer = setTimeout(async () => {
+          if (currentFileId !== null) {
+            const currentPosition = viewerContainer.scrollLeft;
+
+            const container = viewerContainer;
+            const scrollableWidth = container.scrollWidth - container.clientWidth;
+            let progress = 0;
+            if (scrollableWidth > 0) {
+              progress = (Math.abs(currentPosition) / scrollableWidth) * 100;
+              progress = Math.max(0, Math.min(100, progress));
+            }
+
+            const currentSettings = getCurrentSettings();
+
+            try {
+              await updateReaderState(currentFileId, currentPosition, progress, currentSettings);
+              console.log(`State saved for ${currentFileId}`);
+            } catch (error) {
+              console.error('Failed to save state:', error);
+            }
+          }
+        }, 1000);
+      }
+
+      viewerContainer.addEventListener('scroll', () => {
+        updateProgress();
+        saveReaderStateDebounced();
+      });
+
+      [fontSizeSlider, columnGapSlider, letterSpacingSlider, lineHeightSlider, fontFamilySelect, swapTapCheckbox, flipWidth].forEach(el => {
+        if (!el) return;
+        el.addEventListener('input', saveReaderStateDebounced);
+        el.addEventListener('input', () => {
+          updateValueDisplays();
+          if (el === fontSizeSlider) {
+            textContent.style.fontSize = fontSizeSlider.value + 'rem';
+          } else if (el === columnGapSlider) {
+            textContent.style.columnGap = columnGapSlider.value + 'em';
+          } else if (el === letterSpacingSlider) {
+            textContent.style.letterSpacing = letterSpacingSlider.value + 'em';
+          } else if (el === lineHeightSlider) {
+            textContent.style.lineHeight = lineHeightSlider.value;
+          } else if (el === fontFamilySelect) {
+            textContent.style.fontFamily = fontFamilySelect.value;
+          } else if (el === flipWidth) {
+            if (typeof flipWidth_display !== 'undefined' && flipWidth_display) {
+              flipWidth_display.value = Number(flipWidth.value).toFixed(2);
+            }
+          }
+        });
+      });
+      // --- 状態保存 終了 ---
+
+
+      fileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        const selectedEncoding = encodingSelect.value;
+
+        libraryMessage.textContent = `読み込み中... (${selectedEncoding})`;
+        libraryMessage.style.color = '#777';
+        libraryMessage.style.display = 'block';
+
+        const reader = new FileReader();
+        reader.readAsArrayBuffer(file);
+        reader.onload = async (e) => {
+          try {
+            const buffer = e.target.result;
+            const decoder = new TextDecoder(selectedEncoding);
+            const text = decoder.decode(buffer);
+
+            const fileData = {
+              fileName: file.name,
+              encoding: selectedEncoding,
+              content: text,
+              lastPosition: 0,
+              progressPercent: 0,
+              settings: getCurrentSettings()
+            };
+            const newId = await saveFileToDB(fileData);
+
+            await openReaderView(newId);
+            fileInput.value = '';
+
+          } catch (err) {
+            libraryMessage.textContent = `エラー: [${selectedEncoding}] でデコード失敗。`;
+            libraryMessage.style.color = '#c00';
+            console.error(err);
+          }
+        };
+        reader.onerror = (e) => {
+          libraryMessage.textContent = 'ファイル読み込みエラー。';
+          libraryMessage.style.color = '#c00';
+        };
+      });
+      // --- ファイル読み込み 終了 ---
+
+      fontSizeSlider.addEventListener('input', () => {
+        textContent.style.fontSize = fontSizeSlider.value + 'rem';
+      });
+      if (columnGapSlider) columnGapSlider.addEventListener('input', () => {
+        textContent.style.columnGap = columnGapSlider.value + 'em';
+      });
+      letterSpacingSlider.addEventListener('input', () => {
+        textContent.style.letterSpacing = letterSpacingSlider.value + 'em';
+      });
+      lineHeightSlider.addEventListener('input', () => {
+        textContent.style.lineHeight = lineHeightSlider.value;
+      });
+      fontFamilySelect.addEventListener('input', () => {
+        textContent.style.fontFamily = fontFamilySelect.value;
+      });
+      // --- 設定UI 終了 ---
+
+
+      uiToggleBtn.addEventListener('click', () => {
+        controlsPanel.classList.toggle('hidden');
+        uiToggleBtn.textContent = controlsPanel.classList.contains('hidden') ? '●' : '・';
+      });
+
+      backToLibraryBtn.addEventListener('click', showLibraryView);
+
+
+      function turnPage(direction) {
+        const isSwapped = swapTapCheckbox.checked;
+        let actualDirection = direction;
+        if (isSwapped) {
+          actualDirection = (direction === 'next') ? 'prev' : 'next';
+        }
+        const container = viewerContainer;
+        const currentScroll = container.scrollLeft;
+        const maxScroll = container.scrollWidth - container.clientWidth;
+        const errorMargin = 5;
+        const pageWidth = container.clientWidth * parseFloat(flipWidth.value);
+        let newScrollLeft;
+
+        if (actualDirection === 'next') {
+          if (currentScroll >= (maxScroll - errorMargin)) return; // 既に右端
+          newScrollLeft = currentScroll + pageWidth;
+          if (newScrollLeft > maxScroll) newScrollLeft = maxScroll; // 行き過ぎ防止
+        } else {
+          if (currentScroll >= errorMargin) return; // 既に左端
+          newScrollLeft = currentScroll - pageWidth;
+          if (newScrollLeft > 0) newScrollLeft = 0; // 行き過ぎ防止
+        }
+        container.scrollLeft = newScrollLeft; 
+      }
+
+      let touchStartTime = 0;
+      let touchStartScrollLeft = 0;
+      let touchStartClientX = 0;
+      const MAX_TAP_DURATION = 300;
+      const MAX_TAP_MOVE_X = 15;
+      const MAX_TAP_SCROLL = 10;
+      function handleTouchStart(e) {
+        touchStartTime = Date.now();
+        touchStartScrollLeft = viewerContainer.scrollLeft;
+        touchStartClientX = (e.touches ? e.touches[0] : e).clientX;
+      }
+
+      function handleTouchEnd(e) {
+        const touchEndTime = Date.now();
+        const touchEndClientX = (e.changedTouches ? e.changedTouches[0] : e).clientX;
+        const duration = touchEndTime - touchStartTime;
+        const deltaX = Math.abs(touchEndClientX - touchStartClientX);
+        const deltaScroll = Math.abs(viewerContainer.scrollLeft - touchStartScrollLeft);
+        if (
+          duration < MAX_TAP_DURATION &&
+          deltaX < MAX_TAP_MOVE_X &&
+          deltaScroll < MAX_TAP_SCROLL
+        ) {
+          const screenWidth = window.innerWidth;
+          if (touchEndClientX < screenWidth * 0.4) {
+            turnPage('next'); // 左タップ = 進む
+          } else if (touchEndClientX > screenWidth * 0.6) {
+            turnPage('prev'); // 右タップ = 戻る
+          }
+        }
+      }
+      const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      if (isTouchDevice) {
+        viewerContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
+        viewerContainer.addEventListener('touchend', handleTouchEnd);
+      } else {
+        viewerContainer.addEventListener('mousedown', handleTouchStart);
+        viewerContainer.addEventListener('mouseup', handleTouchEnd);
+      }
+
+      document.querySelectorAll('.range-button').forEach(button => {
+        button.addEventListener('click', () => {
+          const targetId = button.dataset.target;
+          const rangeInput = document.getElementById(targetId);
+          if (!rangeInput) return;
+
+          const step = parseFloat(rangeInput.step) || 1;
+          const min = parseFloat(rangeInput.min) || 0;
+          const max = parseFloat(rangeInput.max) || 100;
+          let value = parseFloat(rangeInput.value);
+
+          if (button.classList.contains('plus-button')) {
+            value = Math.min(value + step, max);
+          } else if (button.classList.contains('minus-button')) {
+            value = Math.max(value - step, min);
+          }
+
+          rangeInput.value = value;
+
+          const display = document.getElementById(`${targetId}Value`);
+          if (display) display.textContent = (Number(value)).toFixed((step % 1 === 0) ? 0 : 2).replace(/\.00$/, '');
+          if (targetId === 'flipWidth' && flipWidthDisplay) {
+            flipWidthDisplay.value = Number(value).toFixed(2);
+            const fwSpan = document.getElementById('flipWidthValue');
+            if (fwSpan) fwSpan.textContent = Number(value).toFixed(2).replace(/\.00$/, '');
+          }
+
+          rangeInput.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+      });
+
+      document.querySelectorAll('.input-bar').forEach(r => {
+        const valSpan = document.getElementById(`${r.id}Value`);
+        if (valSpan) {
+          const step = parseFloat(r.step) || 1;
+          valSpan.textContent = (Number(r.value)).toFixed((step % 1 === 0) ? 0 : 2).replace(/\.00$/, '');
+        }
+      });
+
+      async function main() {
+        try {
+          await initDB();
+          await showLibraryView();
+        } catch (error) {
+          console.error('Failed to initialize app:', error);
+          alert('アプリケーションの初期化に失敗しました。');
+        }
+      }
+      main();
+
+    });
+  </script>
+
+</body>
+
+</html>
